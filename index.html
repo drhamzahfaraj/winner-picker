@@ -75,7 +75,7 @@
   .err.show{display:block}
 
   /* draw button */
-  .draw-zone{display:flex;flex-direction:column;align-items:center;gap:16px;margin-top:30px}
+  .draw-zone{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:16px;margin-top:30px}
   .draw{font-weight:800;font-size:clamp(22px,4.4vw,32px);color:#fff;background:var(--green);border:none;border-radius:18px;
     padding:24px 60px;cursor:pointer;transition:.22s;box-shadow:0 22px 44px -18px var(--green);font-family:"Tajawal"}
   .draw:hover:not(:disabled){background:var(--green-2);transform:translateY(-3px);box-shadow:0 28px 50px -18px var(--green)}
@@ -192,6 +192,9 @@
 
     <div class="draw-zone">
       <button class="draw" id="draw" disabled>اسحب فائزًا</button>
+      <button class="icon-btn hidden" id="clearBtn" type="button" title="مسح الفائزين وبدء جولة جديدة" aria-label="مسح الفائزين">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H7L3 16a2 2 0 0 1 0-3l9-9a2 2 0 0 1 3 0l5 5a2 2 0 0 1 0 3l-8 8"/><path d="M6 11l6 6"/></svg>
+      </button>
     </div>
 
     <section class="results" id="results">
@@ -247,7 +250,7 @@
   var fileInput=$("file"), filebar=$("filebar"),
       totalCount=$("totalCount"), sheetSel=$("sheet"), errBox=$("err"), uploadLink=$("uploadLink"),
       logoBtn=$("logoBtn"), logoFile=$("logoFile"), sponsorLogo=$("sponsorLogo"),
-      drawBtn=$("draw"), reel=$("reel"), reelLabel=$("reelLabel"),
+      drawBtn=$("draw"), clearBtn=$("clearBtn"), reel=$("reel"), reelLabel=$("reelLabel"),
       reelName=$("reelName"), reelSub=$("reelSub"), results=$("results"), tbody=$("tbody");
   var workbook=null, sheetNames=[];
 
@@ -397,11 +400,12 @@
       var data=dedupe(gridToData(grid));
       if(!data || !data.length) return;
       if(spinning) return;
-      if(tbody.children.length===0){
-        // no winners drawn yet -> safe to do a normal refresh
+      var started = false; for(var k in drawnKeys){ started=true; break; }
+      if(!started){
+        // nobody drawn yet -> safe to do a normal refresh
         applyData("مصدر عبر الإنترنت", data);
       } else {
-        // a draw is in progress -> update the remaining pool, keep winners on screen
+        // a round has started -> update the remaining pool, keep exclusions & anything on screen
         allData=data;
         pool=data.filter(function(o){ return !drawnKeys[keyOf(o)]; });
         totalCount.textContent=data.length;
@@ -445,6 +449,7 @@
     filebar.classList.add("show");
     // reset any previous draw
     tbody.innerHTML=""; results.classList.remove("show"); reel.classList.remove("show","landed");
+    clearBtn.classList.add("hidden");
     drawBtn.disabled=false; updateRemain();
   }
   function updateRemain(){
@@ -519,6 +524,7 @@
 
   function addRow(w){
     results.classList.add("show");
+    clearBtn.classList.remove("hidden");
     var n=tbody.children.length+1;
     var name=cell(w.name),college=cell(w.college),sid=cell(w.sid);
     var tr=document.createElement("tr");
@@ -587,6 +593,18 @@
   fileInput.addEventListener("change",function(e){ if(e.target.files[0]) loadFile(e.target.files[0]); });
   sheetSel.addEventListener("change",function(){ if(workbook) loadSheet(sheetSel.value); });
   drawBtn.addEventListener("click",doDraw);
+
+  // Erase the winners from the screen to start a new round — WITHOUT bringing back
+  // anyone already drawn (they stay excluded so new winners are always different).
+  function clearWinners(){
+    if(spinning) return;
+    tbody.innerHTML="";
+    results.classList.remove("show");
+    reel.classList.remove("show","landed");
+    clearBtn.classList.add("hidden");
+    drawBtn.disabled = pool.length===0;
+  }
+  clearBtn.addEventListener("click", clearWinners);
 
   if(SHEET_ID || SOURCE_URL){
     loadFromURL();
